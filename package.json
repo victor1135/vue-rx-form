@@ -1,0 +1,27 @@
+{
+  "name": "vue-rx-form",
+  "version": "1.0.0",
+  "description": "A vue reactive form",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": ["lib/**/*"],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "rxjs": "^6.4.0",
+    "vue": "^2.6.10"
+  },
+  "devDependencies": {
+    "prettier": "^1.16.4",
+    "rxjs": "^6.4.0",
+    "tslint": "^5.15.0",
+    "tslint-config-prettier": "^1.18.0",
+    "typescript": "^3.4.1",
+    "vue-template-compiler": "^2.6.10"
+  }
+}
