@@ -9,10 +9,10 @@ npm install vue-rx-form --save
 
 ## Table of Contents
 * [Basic Implement](##Basic-Implement)
-  * [Step1 Importing a new form control](##Step1-Importing-a-new-form-control)
-  * [Step2 Using directive in a component](##Step2-Using-directive-in-a-component)
-  * [Step3 Creating a FormGroup instance](##Step3-Creating-a-FormGroup-instance)
-  * [Step4 Associating the FormControl model and view](##Step4-Associating-the-FormControl-model-and-view)
+  * [Step1 Importing a new form control](###Step1-Importing-a-new-form-control)
+  * [Step2 Using directive in a component](###Step2-Using-directive-in-a-component)
+  * [Step3 Creating a FormGroup instance](###Step3-Creating-a-FormGroup-instance)
+  * [Step4 Associating the FormControl model and view](###Step4-Associating-the-FormControl-model-and-view)
   * [Step5 Get form data](##Step5-Get-form-data)
 
 * [Form Validation](##Form-Validation)
