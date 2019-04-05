@@ -24,9 +24,7 @@ export class Validators {
   }
 
   static max(max: number): ValidatorFn {
-    console.log(max);
     return (control: AbstractControl): ValidationErrors | null => {
-      console.log(max);
       if (isEmptyInputValue(control.value) || isEmptyInputValue(max)) {
         return null; // don't validate empty values to allow optional controls
       }
