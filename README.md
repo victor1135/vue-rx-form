@@ -104,14 +104,8 @@ formBuilder: FormBuilder = new FormBuilder();
 
 created() {
   this.myForm = this.formBuilder.group({
-    name: '',
-    email: '',
-    message: ''
-  });
-
-  this.myForm = this.formBuilder.group({
     name: ['', Validators.required],
-    email: ['',[Validators.required, Validators.email]],
+    email: ['', [Validators.required, Validators.email]],
     message: ''
   })
 
