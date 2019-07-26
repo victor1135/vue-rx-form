@@ -30,8 +30,9 @@ export class FormBuilder {
         asyncValidators = options.asyncValidator != null ? options.asyncValidator : null;
       }
     }
-
-    return new FormGroup(controls, {asyncValidators, updateOn, validators});
+    let returnData = new FormGroup(controls, { asyncValidators, updateOn, validators });
+    returnData.bind = returnData.getRawValue();
+    return returnData;
   }
 
   control(

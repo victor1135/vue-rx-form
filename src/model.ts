@@ -1,12 +1,13 @@
-import { ValidatorFn, AsyncValidatorFn, ValidationErrors } from './directives/validators';
-import { Observable, Subject } from 'rxjs';
-import { composeValidators } from './directives/shared';
+import { ValidatorFn, AsyncValidatorFn, ValidationErrors } from "./directives/validators";
+import { Observable, Subject } from "rxjs";
+import { composeValidators, composeAsyncValidators } from "./directives/shared";
+import { toObservable } from './validators';
 
-export type FormHooks = 'change' | 'blur' | 'submit';
-export const VALID = 'VALID';
-export const INVALID = 'INVALID';
-export const PENDING = 'PENDING';
-export const DISABLED = 'DISABLED';
+export type FormHooks = "change" | "blur" | "submit";
+export const VALID = "VALID";
+export const INVALID = "INVALID";
+export const PENDING = "PENDING";
+export const DISABLED = "DISABLED";
 
 function coerceToValidator(validatorOrOpts?: ValidatorFn | ValidatorFn[] | AbstractControlOptions | null): ValidatorFn | null {
   const validator = (isOptionsObj(validatorOrOpts) ? (validatorOrOpts as AbstractControlOptions).validators : validatorOrOpts) as
@@ -17,8 +18,36 @@ function coerceToValidator(validatorOrOpts?: ValidatorFn | ValidatorFn[] | Abstr
   return Array.isArray(validator) ? composeValidators(validator) : validator || null;
 }
 
+function coerceToAsyncValidator(
+  asyncValidator?: AsyncValidatorFn | AsyncValidatorFn[] | null,
+  validatorOrOpts?: ValidatorFn | ValidatorFn[] | AbstractControlOptions | null
+): AsyncValidatorFn | null {
+  const origAsyncValidator = (isOptionsObj(validatorOrOpts) ? (validatorOrOpts as AbstractControlOptions).asyncValidators : asyncValidator) as
+    | AsyncValidatorFn
+    | AsyncValidatorFn
+    | null;
+
+  return Array.isArray(origAsyncValidator) ? composeAsyncValidators(origAsyncValidator) : origAsyncValidator || null;
+}
+
 function isOptionsObj(validatorOrOpts?: ValidatorFn | ValidatorFn[] | AbstractControlOptions | null): boolean {
-  return validatorOrOpts != null && !Array.isArray(validatorOrOpts) && typeof validatorOrOpts === 'object';
+  return validatorOrOpts != null && !Array.isArray(validatorOrOpts) && typeof validatorOrOpts === "object";
+}
+
+function _find(control: AbstractControl, path: Array<string|number>| string, delimiter: string) {
+  if (path == null) return null;
+
+  if (!(path instanceof Array)) {
+    path = (<string>path).split(delimiter);
+  }
+  if (path instanceof Array && (path.length === 0)) return null;
+
+  return (<Array<string|number>>path).reduce((v: any, name) => {
+    if (v instanceof FormGroup) {
+      return v.controls.hasOwnProperty(name as string) ? v.controls[name] : null;
+    }
+    return null;
+  }, control);
 }
 
 export interface AbstractControlOptions {
@@ -26,7 +55,7 @@ export interface AbstractControlOptions {
 
   asyncValidators?: AsyncValidatorFn | AsyncValidatorFn[] | null;
 
-  updateOn?: 'change' | 'blur' | 'submit';
+  updateOn?: "change" | "blur" | "submit";
 }
 
 export abstract class AbstractControl {
@@ -45,13 +74,11 @@ export abstract class AbstractControl {
   _parent!: FormGroup; // | FormArray;
   _onCollectionChange = () => {};
 
-  constructor(public validator: ValidatorFn|null) {}
+  constructor(public validator: ValidatorFn | null, public asyncValidator: AsyncValidatorFn|null) {}
 
   get parent(): FormGroup {
     return this._parent;
   }
-
-
 
   get valid(): boolean {
     return this.status === VALID;
@@ -73,8 +100,6 @@ export abstract class AbstractControl {
     return this.status !== DISABLED;
   }
 
-
-
   /** @internal */
   _initObservables() {
     (this as { valueChanges: Observable<any> }).valueChanges = new Subject();
@@ -83,6 +108,10 @@ export abstract class AbstractControl {
 
   setValidators(newValidator: ValidatorFn | ValidatorFn[] | null): void {
     this.validator = coerceToValidator(newValidator);
+  }
+
+  setAsyncValidators(newValidator: AsyncValidatorFn|AsyncValidatorFn[]|null): void {
+    this.asyncValidator = coerceToAsyncValidator(newValidator);
   }
 
   clearValidators(): void {
@@ -105,14 +134,30 @@ export abstract class AbstractControl {
 
   abstract reset(value?: any, options?: Object): void;
 
+  get(path: Array<string|number>|string): AbstractControl|null { return _find(this, path, '.'); }
+
   private _updateAncestors(opts: { onlySelf?: boolean }) {
     if (this._parent && !opts.onlySelf) {
       this._parent.updateValueAndValidity(opts);
     }
   }
 
+  private _runAsyncValidator(emitEvent?: boolean): void {
+    if (this.asyncValidator) {
+      (this as { status: string }).status = PENDING;
+      const obs = toObservable(this.asyncValidator(this));
+      this._asyncValidationSubscription = obs.subscribe((errors: ValidationErrors | null) => this.setErrors(errors, { emitEvent }));
+    }
+  }
+
+  private _cancelExistingSubscription(): void {
+    if (this._asyncValidationSubscription) {
+      this._asyncValidationSubscription.unsubscribe();
+    }
+  }
+
   private _setInitialStatus() {
-    (this as{status: string}).status = this._allControlsDisabled() ? DISABLED : VALID;
+    (this as { status: string }).status = this._allControlsDisabled() ? DISABLED : VALID;
   }
 
   updateValueAndValidity(opts: { onlySelf?: boolean; emitEvent?: boolean } = {}): void {
@@ -120,8 +165,12 @@ export abstract class AbstractControl {
     this._updateValue();
 
     if (this.enabled) {
+      this._cancelExistingSubscription();
       (this as { errors: ValidationErrors | null }).errors = this._runValidator();
       (this as { status: string }).status = this._calculateStatus();
+      if (this.status === VALID || this.status === PENDING) {
+        this._runAsyncValidator(opts.emitEvent);
+      }
     }
 
     if (opts.emitEvent !== false) {
@@ -195,8 +244,9 @@ export abstract class AbstractControl {
   }
 
   _isBoxedValue(formState: any): boolean {
-    return typeof formState === 'object' && formState !== null &&
-        Object.keys(formState).length === 2 && 'value' in formState && 'disabled' in formState;
+    return (
+      typeof formState === "object" && formState !== null && Object.keys(formState).length === 2 && "value" in formState && "disabled" in formState
+    );
   }
 }
 
@@ -213,9 +263,10 @@ export class FormControl extends AbstractControl {
   constructor(
     formState: any = null,
     validatorOrOpts?: ValidatorFn | ValidatorFn[] | AbstractControlOptions | null,
-    asyncValidator?: AsyncValidatorFn | AsyncValidatorFn[] | null
+    asyncValidator?: AsyncValidatorFn|AsyncValidatorFn[]|null
   ) {
-    super(coerceToValidator(validatorOrOpts));
+    super(        coerceToValidator(validatorOrOpts),
+    coerceToAsyncValidator(asyncValidator, validatorOrOpts));
     this._applyFormState(formState);
     // this._setUpdateStrategy(validatorOrOpts);
     this.updateValueAndValidity({ onlySelf: true, emitEvent: false });
@@ -311,11 +362,10 @@ export class FormControl extends AbstractControl {
 
   private _applyFormState(formState: any) {
     if (this._isBoxedValue(formState)) {
-      (this as{value: any}).value = this._pendingValue = formState.value;
-      formState.disabled ? this.disable({onlySelf: true, emitEvent: false}) :
-                           this.enable({onlySelf: true, emitEvent: false});
+      (this as { value: any }).value = this._pendingValue = formState.value;
+      formState.disabled ? this.disable({ onlySelf: true, emitEvent: false }) : this.enable({ onlySelf: true, emitEvent: false });
     } else {
-      (this as{value: any}).value = this._pendingValue = formState;
+      (this as { value: any }).value = this._pendingValue = formState;
     }
   }
 }
@@ -324,9 +374,12 @@ export class FormGroup extends AbstractControl {
   constructor(
     public controls: { [key: string]: AbstractControl },
     validatorOrOpts?: ValidatorFn | ValidatorFn[] | AbstractControlOptions | null,
-    asyncValidator?: AsyncValidatorFn | AsyncValidatorFn[] | null
+    asyncValidator?: AsyncValidatorFn | AsyncValidatorFn[] | null,
+    public bind?: any
   ) {
-    super(coerceToValidator(validatorOrOpts));
+    super(
+      coerceToValidator(validatorOrOpts),
+      coerceToAsyncValidator(asyncValidator, validatorOrOpts));
     this._initObservables();
     // this._setUpdateStrategy(validatorOrOpts);
     this._setUpControls();
@@ -371,6 +424,9 @@ export class FormGroup extends AbstractControl {
     Object.keys(value).forEach(name => {
       this._throwIfControlMissing(name);
       this.controls[name].setValue(value[name], { onlySelf: true, emitEvent: options.emitEvent });
+      if(this.bind){
+        this.bind[name] = value[name] as any;
+      }
     });
     this.updateValueAndValidity(options);
   }
@@ -379,6 +435,9 @@ export class FormGroup extends AbstractControl {
     Object.keys(value).forEach(name => {
       if (this.controls[name]) {
         this.controls[name].patchValue(value[name], { onlySelf: true, emitEvent: options.emitEvent });
+        if(this.bind){
+          this.bind[name] = value[name] as any;
+        }
       }
     });
     this.updateValueAndValidity(options);
@@ -478,3 +537,5 @@ export class FormGroup extends AbstractControl {
     });
   }
 }
+
+

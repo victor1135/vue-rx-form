@@ -1,4 +1,4 @@
-import { AbstractControl } from "@/model";
+import { AbstractControl } from "../model";
 import { Observable } from "rxjs";
 
 export type ValidationErrors = {
@@ -19,22 +19,6 @@ export interface Validator {
 }
 
 export interface AsyncValidator extends Validator {
-
-  validate(control: AbstractControl): Promise<ValidationErrors | null> | Observable<ValidationErrors | null>;
+  validate(control: AbstractControl): Promise<ValidationErrors|null>|Observable<ValidationErrors|null>;
 }
 
-export function normalizeValidator(validator: ValidatorFn | Validator): ValidatorFn | any {
-  if ((<Validator>validator).validate) {
-    return (c: AbstractControl) => (<Validator>validator).validate(c);
-  } else {
-    return <ValidatorFn>validator;
-  }
-}
-
-export function normalizeAsyncValidator(validator: AsyncValidatorFn | AsyncValidator): AsyncValidatorFn {
-  if ((<AsyncValidator>validator).validate) {
-    return (c: AbstractControl) => (<AsyncValidator>validator).validate(c);
-  } else {
-    return <AsyncValidatorFn>validator;
-  }
-}
